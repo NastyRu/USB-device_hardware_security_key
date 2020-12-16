@@ -4,12 +4,112 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/fs.h>
+#include <asm/segment.h>
+#include <asm/uaccess.h>
+#include <linux/fs_struct.h>
+#include <asm/current.h>
+#include <linux/proc_fs.h>
+#include <linux/mount.h>
+#include <linux/seq_file.h>
+#include <linux/stat.h>
+#include <linux/syscalls.h>
+#include <linux/notifier.h>
 #include "config.h"
 
 #define USB_COUNT 4
+#define NAME_USB_LEN 8
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Sidenko");
+
+static char *read_file(char *filename)
+{
+    struct kstat *stat;
+    struct file *fp;
+    mm_segment_t fs;
+    loff_t pos = 0;
+    char *buf;
+    int size;
+
+    fp = filp_open(filename, O_RDWR, 0644);
+    if (IS_ERR(fp))
+    {
+        printk(KERN_ERR "USB MODULE: Open file error.\n");
+        return NULL;
+    }
+
+    fs = get_fs();
+    set_fs(KERNEL_DS);
+    
+    stat = (struct kstat *)kmalloc(sizeof(struct kstat), GFP_KERNEL);
+    if (!stat)
+    {
+        printk(KERN_ERR "USB MODULE: Kmalloc stat error.\n");
+        return NULL;
+    }
+
+    vfs_stat(filename, stat);
+    size = stat->size;
+
+    buf = kmalloc(size, GFP_KERNEL);
+    if (!buf) {
+        kfree(stat);
+        printk(KERN_ERR "USB MODULE: Kmalloc buf error\n");
+        return NULL;
+    }
+
+    kernel_read(fp, buf, size, &pos);
+
+    filp_close(fp, NULL);
+    set_fs(fs);
+    kfree(stat);
+    buf[size]='\0';
+    return buf;
+}
+
+static int call_encryption(char *name_device) {
+	printk(KERN_INFO "USB MODULE: Call_encrypt\n");
+    char *data = read_file("/media/parallels/SAG/password.txt");
+    printk(KERN_INFO "USB MODULE: %s\n", data);
+	
+	char *argv[] = {
+        "/home/parallels/Desktop/Operating_systems_coursework/crypto",
+        NULL };
+
+	static char *envp[] = {
+        "HOME=/",
+        "TERM=linux",
+        "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
+        NULL };
+
+	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) {
+		printk(KERN_ERR "USB MODULE: Error when calling user helper\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int call_decryption(void) {
+	printk(KERN_INFO "USB MODULE: Call_decrypt\n");
+	char *argv[] = {
+        "/home/parallels/Desktop/Operating_systems_coursework/crypto",
+        NULL };
+
+	static char *envp[] = {
+        "HOME=/",
+        "TERM=linux",
+        "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
+        NULL };
+
+	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) {
+		printk(KERN_ERR "USB MODULE: Error when calling user helper\n");
+		return -1;
+	}
+
+	return 0;
+}
 
 typedef struct our_usb_device {
     struct usb_device_id dev_id;
@@ -43,30 +143,42 @@ static bool device_id_match_device_id(struct usb_device_id *new_dev_id, const st
 }
 
 // Check our list of devices, if we know device.
-static bool usb_device_id_is_known(struct usb_device_id *dev)
+static char *usb_device_id_is_known(struct usb_device_id *dev)
 {
     unsigned long known_devices_len = sizeof(known_devices) / sizeof(known_devices[0]);
     int i = 0;
     for (i = 0; i < known_devices_len; i++)
     {
-        if (device_id_match_device_id(dev, &known_devices[i]))
-            return true;
+        if (device_id_match_device_id(dev, &known_devices[i].dev_id))
+        {
+            int size = sizeof(known_devices[i].name);
+            char *name = (char *)kmalloc(size + 1, GFP_KERNEL);
+            int j = 0;
+            for (j = 0; j < size; j++)
+                name[j] = known_devices[i].name[j];
+            name[size + 1] = '\0';
+
+            return name;
+        }
     }
-    return false;
+    return NULL;
 }
 
-static bool can_we_encrypt(void)
+static char *knowing_device(void)
 {
     our_usb_device_t *temp;
     int count = 0;
+    char *name;
+
     list_for_each_entry(temp, &connected_devices, list_node) {
-        if (!usb_device_id_is_known(&temp->dev_id))
-            return false;
+        name = usb_device_id_is_known(&temp->dev_id);
+        if (!name)
+            return NULL;
         count++;
     }
     if (0 == count)
-        return false;
-    return true;
+        return NULL;
+    return name;
 }
 
 static void print_our_usb_devices(void)
@@ -80,7 +192,7 @@ static void print_our_usb_devices(void)
 
 static void add_our_usb_device(struct usb_device *dev)
 {
-    our_usb_device_t* new_usb_device = (our_usb_device_t*)kmalloc(sizeof(our_usb_device_t), GFP_KERNEL);
+    our_usb_device_t* new_usb_device = (our_usb_device_t *)kmalloc(sizeof(our_usb_device_t), GFP_KERNEL);
     struct usb_device_id new_id = { USB_DEVICE(dev->descriptor.idVendor, dev->descriptor.idProduct) };
     new_usb_device->dev_id = new_id;
     list_add_tail(&new_usb_device->list_node, &connected_devices);
@@ -103,22 +215,36 @@ static void delete_our_usb_device(struct usb_device *dev)
 static void usb_dev_insert(struct usb_device *dev)
 {   
     add_our_usb_device(dev);
+    char *name = knowing_device();
     
-    if (can_we_encrypt())
-        printk(KERN_INFO "USB MODULE: New device, we can encrypt.\n");
+    if (name)
+    {
+        call_encryption(name); 
+        printk(KERN_INFO "USB MODULE: New device we can encrypt.\n");
+    }
     else
+   {
+        call_decryption();
         printk(KERN_INFO "USB MODULE: New device, we can't encrypt.\n");
+    }
 }
 
 // If usb device removed.
 static void usb_dev_remove(struct usb_device *dev)
 {
     delete_our_usb_device(dev);
+    char *name = knowing_device();
 
-    if (can_we_encrypt())
+    if (name)
+    {
+        call_encryption(name); 
         printk(KERN_INFO "USB MODULE: Delete device, we can encrypt.\n");
+    }
     else
+    {
+        call_decryption();
         printk(KERN_INFO "USB MODULE: Delete device, we can't encrypt.\n");
+    }
 }
 
 // New notify.
@@ -139,10 +265,10 @@ static int notify(struct notifier_block *self, unsigned long action, void *dev)
     return 0;
 }
 
-
 // Struct to react on different notifies.
 static struct notifier_block usb_notify = {
     .notifier_call = notify,
+    .priority = 19,
 };
 
 static int __init my_module_init(void)
