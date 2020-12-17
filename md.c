@@ -35,7 +35,6 @@ static char *read_file(char *filename)
     fp = filp_open(filename, O_RDWR, 0644);
     if (IS_ERR(fp))
     {
-        printk(KERN_ERR "USB MODULE: Open file error.\n");
         return NULL;
     }
 
@@ -45,7 +44,6 @@ static char *read_file(char *filename)
     stat = (struct kstat *)kmalloc(sizeof(struct kstat), GFP_KERNEL);
     if (!stat)
     {
-        printk(KERN_ERR "USB MODULE: Kmalloc stat error.\n");
         return NULL;
     }
 
@@ -53,9 +51,9 @@ static char *read_file(char *filename)
     size = stat->size;
 
     buf = kmalloc(size, GFP_KERNEL);
-    if (!buf) {
+    if (!buf) 
+    {
         kfree(stat);
-        printk(KERN_ERR "USB MODULE: Kmalloc buf error\n");
         return NULL;
     }
 
@@ -68,13 +66,19 @@ static char *read_file(char *filename)
     return buf;
 }
 
-static int call_encryption(char *name_device) {
-	printk(KERN_INFO "USB MODULE: Call_encrypt\n");
-    char *data = read_file("/media/parallels/SAG/password.txt");
-    printk(KERN_INFO "USB MODULE: %s\n", data);
+static int call_decryption(char *name_device) {
+	printk(KERN_INFO "USB MODULE: Call_decrypt\n");
+    
+    char path[80];
+    strcpy(path, USB_FOLDER);
+    strcat(path, name_device);
+    strcat(path, "/");
+    strcat(path, PASSWORD_FILE);
+    char *data = read_file(path);
 	
 	char *argv[] = {
         "/home/parallels/Desktop/Operating_systems_coursework/crypto",
+        data,
         NULL };
 
 	static char *envp[] = {
@@ -83,16 +87,16 @@ static int call_encryption(char *name_device) {
         "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
         NULL };
 
-	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) {
-		printk(KERN_ERR "USB MODULE: Error when calling user helper\n");
+	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
+    {
 		return -1;
 	}
 
 	return 0;
 }
 
-static int call_decryption(void) {
-	printk(KERN_INFO "USB MODULE: Call_decrypt\n");
+static int call_encryption(void) {
+	printk(KERN_INFO "USB MODULE: Call_encrypt\n");
 	char *argv[] = {
         "/home/parallels/Desktop/Operating_systems_coursework/crypto",
         NULL };
@@ -103,8 +107,8 @@ static int call_decryption(void) {
         "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
         NULL };
 
-	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) {
-		printk(KERN_ERR "USB MODULE: Error when calling user helper\n");
+	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
+    {
 		return -1;
 	}
 
@@ -219,12 +223,16 @@ static void usb_dev_insert(struct usb_device *dev)
     
     if (name)
     {
-        call_encryption(name); 
+        if (state_encrypt)
+            call_decryption(name);
+        state_encrypt = false;
         printk(KERN_INFO "USB MODULE: New device we can encrypt.\n");
     }
     else
    {
-        call_decryption();
+        if (!state_encrypt)
+            call_encryption();
+        state_encrypt = true;
         printk(KERN_INFO "USB MODULE: New device, we can't encrypt.\n");
     }
 }
@@ -237,12 +245,16 @@ static void usb_dev_remove(struct usb_device *dev)
 
     if (name)
     {
-        call_encryption(name); 
+        if (state_encrypt)
+            call_decryption(name);
+        state_encrypt = false; 
         printk(KERN_INFO "USB MODULE: Delete device, we can encrypt.\n");
     }
     else
     {
-        call_decryption();
+        if (!state_encrypt)
+            call_encryption();
+        state_encrypt = true;
         printk(KERN_INFO "USB MODULE: Delete device, we can't encrypt.\n");
     }
 }
@@ -274,6 +286,7 @@ static struct notifier_block usb_notify = {
 static int __init my_module_init(void)
 {
     usb_register_notify(&usb_notify);
+    call_encryption();
     printk(KERN_INFO "USB MODULE: loaded.\n");
     return 0;
 }
