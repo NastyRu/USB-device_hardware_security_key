@@ -283,7 +283,6 @@ static int notify(struct notifier_block *self, unsigned long action, void *dev)
 // Struct to react on different notifies.
 static struct notifier_block usb_notify = {
     .notifier_call = notify,
-    .priority = 19,
 };
 
 static int __init my_module_init(void)
