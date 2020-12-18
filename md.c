@@ -23,6 +23,7 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Sidenko");
 
+// Read password from USB device
 static char *read_file(char *filename)
 {
     struct kstat *stat;
@@ -66,53 +67,55 @@ static char *read_file(char *filename)
     return buf;
 }
 
+// Call decryption from user space
 static int call_decryption(char *name_device) {
-	printk(KERN_INFO "USB MODULE: Call_decrypt\n");
-    
+    printk(KERN_INFO "USB MODULE: Call_decrypt\n");
+
     char path[80];
     strcpy(path, USB_FOLDER);
     strcat(path, name_device);
     strcat(path, "/");
     strcat(path, PASSWORD_FILE);
     char *data = read_file(path);
-	
-	char *argv[] = {
+
+    char *argv[] = {
         "/home/parallels/Desktop/Operating_systems_coursework/crypto",
         data,
         NULL };
 
-	static char *envp[] = {
+    static char *envp[] = {
         "HOME=/",
         "TERM=linux",
         "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
         NULL };
 
-	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
+    if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
     {
-		return -1;
-	}
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
+// Call encryption from user space
 static int call_encryption(void) {
-	printk(KERN_INFO "USB MODULE: Call_encrypt\n");
-	char *argv[] = {
+    printk(KERN_INFO "USB MODULE: Call_encrypt\n");
+    char *argv[] = {
         "/home/parallels/Desktop/Operating_systems_coursework/crypto",
         NULL };
 
-	static char *envp[] = {
+    static char *envp[] = {
         "HOME=/",
         "TERM=linux",
         "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
         NULL };
 
-	if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
+    if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
     {
-		return -1;
-	}
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 typedef struct our_usb_device {
