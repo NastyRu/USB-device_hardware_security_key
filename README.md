@@ -8,3 +8,11 @@ You need to develop software for tracking USB devices, which has the following f
 - tracking the appearance of new USB devices;
   - if the device is known, the file is decrypted;
   - if the device is not known, the file is encrypted.
+
+**Install:**
+1. make
+2. sudo insmod md.ko
+
+**Uninstall:**
+1. sudo rmmod md
+2. make clean
