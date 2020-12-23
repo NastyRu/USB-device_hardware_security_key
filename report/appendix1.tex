@@ -1,0 +1,408 @@
+\chapter{Листинги}
+
+ \begin{lstlisting}[caption = Структура usb\_device, label =  lst:usb_device]
+struct usb_device {
+	int		devnum;
+	char		devpath[16];
+	u32		route;
+	enum usb_device_state	state;
+	enum usb_device_speed	speed;
+	unsigned int		rx_lanes;
+	unsigned int		tx_lanes;
+
+	struct usb_tt	*tt;
+	int		ttport;
+
+	unsigned int toggle[2];
+
+	struct usb_device *parent;
+	struct usb_bus *bus;
+	struct usb_host_endpoint ep0;
+
+	struct device dev;
+
+	struct usb_device_descriptor descriptor;
+	struct usb_host_bos *bos;
+	struct usb_host_config *config;
+
+	struct usb_host_config *actconfig;
+	struct usb_host_endpoint *ep_in[16];
+	struct usb_host_endpoint *ep_out[16];
+
+	char **rawdescriptors;
+
+	unsigned short bus_mA;
+	u8 portnum;
+	u8 level;
+	u8 devaddr;
+
+	unsigned can_submit:1;
+	unsigned persist_enabled:1;
+	unsigned have_langid:1;
+	unsigned authorized:1;
+	unsigned authenticated:1;
+	unsigned wusb:1;
+	unsigned lpm_capable:1;
+	unsigned usb2_hw_lpm_capable:1;
+	unsigned usb2_hw_lpm_besl_capable:1;
+	unsigned usb2_hw_lpm_enabled:1;
+	unsigned usb2_hw_lpm_allowed:1;
+	unsigned usb3_lpm_u1_enabled:1;
+	unsigned usb3_lpm_u2_enabled:1;
+	int string_langid;
+
+	/* static strings from the device */
+	char *product;
+	char *manufacturer;
+	char *serial;
+
+	struct list_head filelist;
+
+	int maxchild;
+
+	u32 quirks;
+	atomic_t urbnum;
+
+	unsigned long active_duration;
+
+#ifdef CONFIG_PM
+	unsigned long connect_time;
+
+	unsigned do_remote_wakeup:1;
+	unsigned reset_resume:1;
+	unsigned port_is_suspended:1;
+#endif
+	struct wusb_dev *wusb_dev;
+	int slot_id;
+	enum usb_device_removable removable;
+	struct usb2_lpm_parameters l1_params;
+	struct usb3_lpm_parameters u1_params;
+	struct usb3_lpm_parameters u2_params;
+	unsigned lpm_disable_count;
+
+	u16 hub_delay;
+	unsigned use_generic_driver:1;
+};
+ \end{lstlisting}
+ 
+  \begin{lstlisting}[caption = Структура usb\_device\_id, label =  lst:usb_device_id]
+ struct usb_device_id {
+	/* which fields to match against? */
+	__u16		match_flags;
+
+	/* Used for product specific matches; range is inclusive */
+	__u16		idVendor;
+	__u16		idProduct;
+	__u16		bcdDevice_lo;
+	__u16		bcdDevice_hi;
+
+	/* Used for device class matches */
+	__u8		bDeviceClass;
+	__u8		bDeviceSubClass;
+	__u8		bDeviceProtocol;
+
+	/* Used for interface class matches */
+	__u8		bInterfaceClass;
+	__u8		bInterfaceSubClass;
+	__u8		bInterfaceProtocol;
+
+	/* Used for vendor-specific interface matches */
+	__u8		bInterfaceNumber;
+
+	/* not matched against */
+	kernel_ulong_t	driver_info
+		__attribute__((aligned(sizeof(kernel_ulong_t))));
+};
+ \end{lstlisting}
+
+  \begin{lstlisting}[caption = Добавление usb устройства, label =  lst:add_usb]
+static void add_our_usb_device(struct usb_device *dev)
+{
+    our_usb_device_t* new_usb_device = (our_usb_device_t *)kmalloc(sizeof(our_usb_device_t), GFP_KERNEL);
+    struct usb_device_id new_id = { USB_DEVICE(dev->descriptor.idVendor, dev->descriptor.idProduct) };
+    new_usb_device->dev_id = new_id;
+    list_add_tail(&new_usb_device->list_node, &connected_devices);
+}
+ \end{lstlisting}
+ 
+  \begin{lstlisting}[caption = Удаление usb устройства, label =  lst:del_usb]
+static void delete_our_usb_device(struct usb_device *dev)
+{
+    our_usb_device_t *device, *temp;
+    list_for_each_entry_safe(device, temp, &connected_devices, list_node) 
+    {
+        if (device_match_device_id(dev, &device->dev_id))
+        {
+            list_del(&device->list_node);
+            kfree(device);
+        }
+    }
+}
+ \end{lstlisting}
+ 
+  \begin{lstlisting}[caption = Makefile, label =  lst:makefile]
+ifneq ($(KERNELRELEASE),)
+	obj-m := md.o
+else
+	CURRENT = $(shell uname -r)
+	KDIR = /lib/modules/$(CURRENT)/build
+	PWD = $(shell pwd)
+
+default:
+	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
+clean:
+	rm -rf .tmp_versions
+	rm *.ko
+	rm *.o
+	rm *.mod.c
+	rm *.symvers
+	rm *.order
+
+endif
+ \end{lstlisting}
+ 
+   \begin{lstlisting}[caption = Конфигурационный файл USB устройств, label =  lst:config_usb]
+ struct known_usb_device {    struct usb_device_id dev_id;    char *name;};// List of all USB devices you knowstatic const struct known_usb_device known_devices[] = {    { .dev_id = { USB_DEVICE(0x058f, 0x6387) }, .name = "SAG" },};
+  \end{lstlisting}
+
+   \begin{lstlisting}[caption = Конфигурационный файл секретных файлов и приложений, label =  lst:config_file]  
+  static char *secret_apps[] = {    "/home/parallels/Desktop/Operating_systems_coursework/file.txt",    "/home/parallels/Desktop/Operating_systems_coursework/xor",    "/usr/bin/firefox",	NULL,};
+    \end{lstlisting}
+ 
+   \begin{lstlisting}[caption = Загрузка и удаление модуля ядра, label =  lst:module]
+static int __init my_module_init(void)
+{
+    usb_register_notify(&usb_notify);
+    call_encryption();
+    printk(KERN_INFO "USB MODULE: loaded.\n");
+    return 0;
+}
+
+static void __exit my_module_exit(void)
+{
+    usb_unregister_notify(&usb_notify);    
+    printk(KERN_INFO "USB MODULE: unloaded.\n");
+}
+
+module_init(my_module_init);
+module_exit(my_module_exit);
+ \end{lstlisting}
+ 
+ 
+    \begin{lstlisting}[caption = Функция-обработчик, label =  lst:notify]
+// If usb device inserted.
+static void usb_dev_insert(struct usb_device *dev)
+{   
+    add_our_usb_device(dev);
+    char *name = knowing_device();
+    
+    if (name)
+    {
+        if (state_encrypt)
+            call_decryption(name);
+        state_encrypt = false;
+        printk(KERN_INFO "USB MODULE: New device we can encrypt.\n");
+    }
+    else
+   {
+        if (!state_encrypt)
+            call_encryption();
+        state_encrypt = true;
+        printk(KERN_INFO "USB MODULE: New device, we can't encrypt.\n");
+    }
+}
+
+// If usb device removed.
+static void usb_dev_remove(struct usb_device *dev)
+{
+    delete_our_usb_device(dev);
+    char *name = knowing_device();
+
+    if (name)
+    {
+        if (state_encrypt)
+            call_decryption(name);
+        state_encrypt = false; 
+        printk(KERN_INFO "USB MODULE: Delete device, we can encrypt.\n");
+    }
+    else
+    {
+        if (!state_encrypt)
+            call_encryption();
+        state_encrypt = true;
+        printk(KERN_INFO "USB MODULE: Delete device, we can't encrypt.\n");
+    }
+}
+
+// New notify.
+static int notify(struct notifier_block *self, unsigned long action, void *dev)
+{
+    // Events, which our notifier react.
+    switch (action) 
+    {
+        case USB_DEVICE_ADD:
+            usb_dev_insert(dev);
+	        break;
+        case USB_DEVICE_REMOVE:
+            usb_dev_remove(dev);
+	        break;
+        default:
+	        break;
+    }
+    return 0;
+}
+ \end{lstlisting}
+ 
+\begin{lstlisting}[caption = Функции для проверки разрешенных устройств, label =  lst:check]
+// Match device id with device id.
+static bool device_id_match_device_id(struct usb_device_id *new_dev_id, const struct usb_device_id *dev_id)
+{
+    // Check idVendor and idProduct, which are used.
+    if (dev_id->idVendor != new_dev_id->idVendor)
+        return false;
+    if (dev_id->idProduct != new_dev_id->idProduct)
+        return false;
+    return true;
+}
+
+// Check our list of devices, if we know device.
+static char *usb_device_id_is_known(struct usb_device_id *dev)
+{
+    unsigned long known_devices_len = sizeof(known_devices) / sizeof(known_devices[0]);
+    int i = 0;
+    for (i = 0; i < known_devices_len; i++)
+    {
+        if (device_id_match_device_id(dev, &known_devices[i].dev_id))
+        {
+            int size = sizeof(known_devices[i].name);
+            char *name = (char *)kmalloc(size + 1, GFP_KERNEL);
+            int j = 0;
+            for (j = 0; j < size; j++)
+                name[j] = known_devices[i].name[j];
+            name[size + 1] = '\0';
+
+            return name;
+        }
+    }
+    return NULL;
+}
+
+static char *knowing_device(void)
+{
+    our_usb_device_t *temp;
+    int count = 0;
+    char *name;
+
+    list_for_each_entry(temp, &connected_devices, list_node) {
+        name = usb_device_id_is_known(&temp->dev_id);
+        if (!name)
+            return NULL;
+        count++;
+    }
+    if (0 == count)
+        return NULL;
+    return name;
+}
+ \end{lstlisting}
+ 
+ 
+    \begin{lstlisting}[caption = Считывание пароля из файла USB устройства, label =  lst:password]
+static char *read_file(char *filename)
+{
+    struct kstat *stat;
+    struct file *fp;
+    mm_segment_t fs;
+    loff_t pos = 0;
+    char *buf;
+    int size;
+
+    fp = filp_open(filename, O_RDWR, 0644);
+    if (IS_ERR(fp))
+    {
+        return NULL;
+    }
+
+    fs = get_fs();
+    set_fs(KERNEL_DS);
+    
+    stat = (struct kstat *)kmalloc(sizeof(struct kstat), GFP_KERNEL);
+    if (!stat)
+    {
+        return NULL;
+    }
+
+    vfs_stat(filename, stat);
+    size = stat->size;
+
+    buf = kmalloc(size, GFP_KERNEL);
+    if (!buf) 
+    {
+        kfree(stat);
+        return NULL;
+    }
+
+    kernel_read(fp, buf, size, &pos);
+
+    filp_close(fp, NULL);
+    set_fs(fs);
+    kfree(stat);
+    buf[size]='\0';
+    return buf;
+}
+ \end{lstlisting}
+ 
+ \begin{lstlisting}[caption = Функции вызывающие исполняемый файл пользовательского пространства, label =  lst:user_call]
+ static int call_decryption(char *name_device) {
+	printk(KERN_INFO "USB MODULE: Call_decrypt\n");
+    
+    char path[80];
+    strcpy(path, USB_FOLDER);
+    strcat(path, name_device);
+    strcat(path, "/");
+    strcat(path, PASSWORD_FILE);
+    char *data = read_file(path);
+	
+    char *argv[] = {
+     "/home/parallels/Desktop/Operating_systems_coursework/crypto",
+    data,
+    NULL };
+
+    static char *envp[] = {
+    "HOME=/",
+    "TERM=linux",
+    "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
+     NULL };
+
+    if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+static int call_encryption(void) {
+    printk(KERN_INFO "USB MODULE: Call_encrypt\n");
+    char *argv[] = {
+     "/home/parallels/Desktop/Operating_systems_coursework/crypto",
+    NULL };
+
+    static char *envp[] = {
+    "HOME=/",
+    "TERM=linux",
+    "PATH=/sbin:/bin:/usr/sbin:/usr/bin", 
+    NULL };
+
+    if (call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC) < 0) 
+    {
+        return -1;
+    }
+
+    return 0;
+}
+  \end{lstlisting}
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "rpz"
+%%% End: 

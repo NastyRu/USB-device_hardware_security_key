@@ -1,0 +1,64 @@
+%% Преамбула TeX-файла
+
+% 1. Стиль и язык
+\documentclass[utf8x, 14pt]{G7-32} % Стиль (по умолчанию будет 14pt)
+
+% Остальные стандартные настройки убраны в preamble.inc.tex.
+\include{preamble.inc}
+\usepackage{wrapfig}
+
+\newcommand{\rouble}{{\rm{P}\kern-.635em\rule[.5ex]{.52em}{.04em}\kern.11em}}
+
+% Настройки листингов.
+\ifPDFTeX
+\include{listings.inc}
+\else
+\usepackage{local-minted}
+\fi
+
+% Полезные макросы листингов.
+\include{macros.inc}
+
+% Стиль титульного листа и заголовки
+
+
+\begin{document}
+%\include{title}
+
+\includepdf[pages=-]{image/rpz_titul.pdf}
+\includepdf[pages=-]{image/tz.pdf}
+
+\frontmatter % выключает нумерацию ВСЕГО; здесь начинаются ненумерованные главы: реферат, введение, глоссарий, сокращения и прочее.
+
+\include{abstract}
+
+\tableofcontents
+%\printnomenclature % Автоматический список сокращений
+
+\include{intro}
+
+\mainmatter % это включает нумерацию глав и секций в документе ниже
+
+\include{analysis}
+\include{design}
+\include{impl}
+
+\backmatter %% Здесь заканчивается нумерованная часть документа и начинаются ссылки и
+            
+\include{conclusion}%% заключение
+
+
+\include{biblio}
+
+\appendix   % Тут идут приложения
+
+\include{appendix1}
+
+%\include{appendix1}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
