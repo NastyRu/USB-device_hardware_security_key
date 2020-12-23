@@ -6,6 +6,7 @@ else
 	PWD = $(shell pwd)
 
 default:
+	gcc -o crypto crypto.c
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 clean:
@@ -15,5 +16,6 @@ clean:
 	rm *.mod.c
 	rm *.symvers
 	rm *.order
+	rm crypto
 
 endif
