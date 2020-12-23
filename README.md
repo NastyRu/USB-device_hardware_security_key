@@ -1,5 +1,7 @@
 # Operating_systems_coursework
 
+USB-device - hardware security key for application.
+
 The purpose of this work is to implement a loadable kernel module for tracking USB devices, that are the key to accessing the application.
 
 You need to develop software for tracking USB devices, which has the following functionality:
