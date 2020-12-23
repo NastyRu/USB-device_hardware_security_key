@@ -10,6 +10,5 @@ struct known_usb_device {
 
 // List of all USB devices you know
 static const struct known_usb_device known_devices[] = {
-    // Macros used to create struct known_usb_device for device.
     { .dev_id = { USB_DEVICE(0x058f, 0x6387) }, .name = "SAG" },
 };

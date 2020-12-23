@@ -4,5 +4,6 @@
 static char *secret_apps[] = {
     "/home/parallels/Desktop/Operating_systems_coursework/file.txt",
     "/home/parallels/Desktop/Operating_systems_coursework/xor",
+    "/usr/bin/firefox",
 	NULL,
 };
